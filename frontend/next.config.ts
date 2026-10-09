@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
-const port = Number(process.env.INTERIOR_BACKEND_PORT || "18877");
-if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("Invalid INTERIOR_BACKEND_PORT");
+import { resolve } from "node:path";
+import { readBackendPort } from "./lib/serverConfig";
+const port = readBackendPort(resolve(__dirname, "..", ".env"));
 const config: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   async rewrites() {
