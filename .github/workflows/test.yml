@@ -26,6 +26,8 @@ jobs:
       - run: python scripts/audit_public_tree.py
       - if: runner.os == 'Windows'
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tests/runtime-safety.ps1
+      - if: runner.os == 'Windows'
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tests/desktop-shortcuts.ps1
       - run: npm ci
         working-directory: frontend
       - run: npm run typecheck
