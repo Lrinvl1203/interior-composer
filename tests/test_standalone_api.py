@@ -39,12 +39,10 @@ def test_unrelated_product_apis_are_absent(path):
     assert TestClient(server.app).get(path).status_code == 404
 
 
-@pytest.mark.parametrize("mode,key", [("flash", "ARK_API_KEY"), ("premium", "OPENAI_API_KEY")])
+@pytest.mark.parametrize("mode,key", [("flash", "OPENAI_API_KEY"), ("premium", "OPENAI_API_KEY")])
 def test_missing_provider_fails_without_any_cli_or_network_fallback(monkeypatch, tmp_path, mode, key):
-    monkeypatch.setattr(server, "modelark_is_configured", lambda: False)
     monkeypatch.setattr(server, "openai_is_configured", lambda: False)
     called = []
-    monkeypatch.setattr(server, "modelark_generate_image", lambda *a, **kw: called.append("flash"))
     monkeypatch.setattr(server, "openai_generate_image", lambda *a, **kw: called.append("premium"))
     output = tmp_path / "result.png"
     with pytest.raises(ValueError, match=key):
@@ -180,9 +178,8 @@ def test_nonloopback_request_host_cannot_whitelist_its_own_origin():
     assert client.post("/api/interior-reports", headers={"Origin": "http://attacker.invalid:3100"}, json={}).status_code == 403
 
 
-@pytest.mark.parametrize("mode,key", [("flash", "ARK_API_KEY"), ("premium", "OPENAI_API_KEY")])
+@pytest.mark.parametrize("mode,key", [("flash", "OPENAI_API_KEY"), ("premium", "OPENAI_API_KEY")])
 def test_missing_key_worker_error_is_available_to_browser_polling(monkeypatch, tmp_path, mode, key):
-    monkeypatch.setattr(server, "modelark_is_configured", lambda: False)
     monkeypatch.setattr(server, "openai_is_configured", lambda: False)
     source = tmp_path / "before.png"
     Image.new("RGB", (32, 24), "white").save(source)

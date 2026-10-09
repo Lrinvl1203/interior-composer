@@ -391,6 +391,22 @@
     "Empty asset installation returns []; upload decoding is limited to 25 MB and 40 million pixels",
     "Mutations reject non-loopback origins, unexpected local ports, null origins and Sec-Fetch-Site cross-site",
     "Local model caches resolve inside the standalone tree by default; no weights copied",
-    "Persist safe browser-facing job errors; explicit known missing-key guidance and no raw provider error/log disclosure"
-  ]
+    "Persist safe browser-facing job errors; explicit known missing-key guidance and no raw provider error/log disclosure",
+    "OpenAI-only migration: legacy flash/premium modes now select low/high quality on OPENAI_IMAGE_MODEL (default gpt-image-2), including AI asset extraction",
+    "Visual QA now uses OpenAI Responses with a real strict JSON schema and OPENAI_VISION_MODEL (default gpt-5-mini); existing semantic and report approval validators retained",
+    "One OPENAI_API_KEY, official endpoint pinned, SDK automatic retries disabled, vision store=false; malformed/refused/incomplete responses remain unverified",
+    "Historical webapp/modelark.py and its three transport-mocked tests retained only for source provenance; no active imports or API routes use it"
+  ],
+  "openai_migration": {
+    "baseline_commit": "02d49ee034fea26f2c750556a05f206baff0ff2e",
+    "source_hashes_describe_original_extraction_not_modified_runtime": true,
+    "removed_runtime_functions": ["modelark_status"],
+    "models": {"image": "gpt-image-2", "vision": "gpt-5-mini"},
+    "official_docs": [
+      "https://developers.openai.com/api/docs/guides/image-generation",
+      "https://developers.openai.com/api/docs/guides/structured-outputs",
+      "https://developers.openai.com/api/docs/models/gpt-5-mini"
+    ],
+    "validation_policy": "Mock HTTP only; no paid calls. Image generate/edit and Responses requests exercised through OpenAI SDK and in-memory transport."
+  }
 }

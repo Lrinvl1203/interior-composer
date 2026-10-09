@@ -167,7 +167,7 @@ def render_interior_report_pdf(report: dict[str, Any], report_dir: Path, path: P
         ),
         Spacer(1, 3 * mm),
         Paragraph(
-            f"발행일 {_text(korean_report_date(report.get('created_at')))} · 생성 모델 {_text(str(report.get('ai_mode') or '').title())}",
+            f"발행일 {_text(korean_report_date(report.get('created_at')))} · 생성 모드 {'정밀하게' if report.get('ai_mode') == 'premium' else '빠르게'}",
             muted,
         ),
         Spacer(1, 9 * mm),

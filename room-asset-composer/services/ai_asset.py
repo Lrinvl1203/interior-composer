@@ -1,8 +1,7 @@
 """Generate clean transparent interior assets with the OpenAI Image API."""
 from __future__ import annotations
 
-import base64
-from io import BytesIO
+from dataclasses import replace
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
@@ -12,25 +11,7 @@ from PIL import Image, ImageDraw, ImageOps
 from .sam_auto import ObjectMask, extract_object
 
 
-MODEL = "gpt-image-1.5"
-
-
-def _png_file(image: Image.Image, name: str, max_edge: int = 1600):
-    prepared = ImageOps.exif_transpose(image).convert("RGBA")
-    prepared.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
-    data = BytesIO()
-    prepared.save(data, "PNG", optimize=True)
-    data.seek(0)
-    return (name, data, "image/png")
-
-
-def _decode(response) -> Image.Image:
-    payload = response.data[0].b64_json
-    if not payload:
-        raise RuntimeError("이미지 API 응답에 이미지 데이터가 없습니다.")
-    result = Image.open(BytesIO(base64.b64decode(payload)))
-    result.load()
-    return result.convert("RGBA")
+MODEL = "gpt-image-2"  # Compatibility constant; runtime uses OPENAI_IMAGE_MODEL.
 
 
 def _clean_transparency(image: Image.Image) -> Image.Image:
@@ -50,23 +31,21 @@ def _clean_transparency(image: Image.Image) -> Image.Image:
     return result
 
 
-def _client(api_key: str):
-    from openai import OpenAI
-
-    if not api_key.strip():
-        raise ValueError("OpenAI API 키를 입력해 주세요.")
-    return OpenAI(api_key=api_key.strip(), timeout=180)
-
-
-def _modelark_edit(images: list[Image.Image], prompt: str, quality: str) -> Image.Image:
-    """Run the same asset prompt through ModelArk, then restore transparency locally."""
-
+def _provider_edit(images: list[Image.Image], prompt: str, api_key: str, quality: str, ai_mode: str) -> Image.Image:
+    """Both saved legacy modes use the shared OpenAI Image API and local alpha cleanup."""
+    mode = str(ai_mode or "premium").strip().lower()
+    if mode not in {"flash", "premium"}:
+        raise ValueError("AI 모드는 flash 또는 premium이어야 합니다.")
     repo_root = Path(__file__).resolve().parents[2]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
-    from webapp.modelark import generate_image
+    from webapp.openai_provider import OpenAISettings, OpenAIProviderError, generate_image
 
-    with TemporaryDirectory(prefix="asset-modelark-") as temporary:
+    if not api_key.strip():
+        raise OpenAIProviderError("OPENAI_API_KEY를 프로젝트 .env에 설정한 뒤 앱을 다시 시작해 주세요.")
+    settings = replace(OpenAISettings.from_env(required=False), api_key=api_key.strip())
+    image_quality = "low" if mode == "flash" else "high"
+    with TemporaryDirectory(prefix="asset-openai-") as temporary:
         root = Path(temporary)
         inputs: list[Path] = []
         for index, image in enumerate(images, start=1):
@@ -74,37 +53,18 @@ def _modelark_edit(images: list[Image.Image], prompt: str, quality: str) -> Imag
             image.convert("RGBA").save(path, "PNG")
             inputs.append(path)
         output = root / "result.png"
-        result = generate_image(prompt, inputs, output_path=output, quality="pro" if quality == "high" else "standard")
-        generated = Image.open(output); generated.load()
-        cleaned = _clean_transparency(generated)
+        result = generate_image(prompt, inputs, output_path=output, quality=image_quality, settings=settings)
         usage = result.get("usage") if isinstance(result.get("usage"), dict) else {}
-        cleaned.info["provider_metadata"] = {"provider": "modelark", "model": result.get("model"), "usage": usage, "usage_available": bool(usage)}
+        try:
+            with Image.open(output) as generated:
+                generated.load()
+                cleaned = _clean_transparency(generated)
+        except Exception:
+            raise OpenAIProviderError("AI 이미지 생성 후 로컬 투명 배경 처리에 실패했습니다.",
+                                      usage=usage, model=result.get("model")) from None
+        cleaned.info["provider_metadata"] = {"provider": "openai", "model": result.get("model"), "quality": image_quality,
+                                             "usage": usage, "usage_available": bool(usage)}
         return cleaned
-
-
-def _provider_edit(images: list[Image.Image], prompt: str, api_key: str, quality: str, ai_mode: str) -> Image.Image:
-    mode = str(ai_mode or "premium").strip().lower()
-    if mode == "flash":
-        return _modelark_edit(images, prompt, quality)
-    if mode != "premium":
-        raise ValueError("AI 모드는 flash 또는 premium이어야 합니다.")
-    response = _client(api_key).images.edit(
-        model=MODEL,
-        image=[_png_file(image, f"reference_{index:02d}.png") for index, image in enumerate(images, start=1)],
-        prompt=prompt,
-        background="transparent",
-        input_fidelity="high",
-        output_format="png",
-        quality=quality,
-        size="1024x1024",
-    )
-    cleaned = _clean_transparency(_decode(response))
-    usage = getattr(response, "usage", None)
-    if usage is not None and callable(getattr(usage, "model_dump", None)):
-        usage = usage.model_dump()
-    usage = usage if isinstance(usage, dict) else {}
-    cleaned.info["provider_metadata"] = {"provider": "openai", "model": MODEL, "usage": usage, "usage_available": bool(usage)}
-    return cleaned
 
 
 def complete_sam_asset(

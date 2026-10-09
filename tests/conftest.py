@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT / "room-asset-composer"))
 
 @pytest.fixture(autouse=True)
 def isolated_backend(monkeypatch, tmp_path):
-    from webapp import db, server
+    from webapp import db, openai_provider, server
     from services import asset_store
 
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
@@ -29,8 +29,13 @@ def isolated_backend(monkeypatch, tmp_path):
     monkeypatch.setattr(asset_store, "ASSETS_CSV", tmp_path / "assets" / "assets.csv")
     monkeypatch.setattr(asset_store, "PROJECT_ROOT", tmp_path / "asset-service")
     monkeypatch.setattr(server, "jobs", {})
+    # Tests must neither load a recipient's real key nor make a paid SDK request.
+    monkeypatch.setattr(openai_provider, "load_dotenv", lambda *a, **kw: False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     def forbidden_http(*args, **kwargs):
         raise AssertionError("Paid/external HTTP must be explicitly mocked in tests")
 
     monkeypatch.setattr(httpx, "request", forbidden_http)
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", forbidden_http)
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", forbidden_http)

@@ -39,8 +39,7 @@ from webapp import db
 from webapp.image_align import align_result_to_source, lock_composite_to_source
 from webapp.interior_report import render_interior_report_pdf
 from webapp.composition_quality import verify_composition
-from webapp.modelark import ModelArkSettings, generate_image as modelark_generate_image, is_configured as modelark_is_configured
-from webapp.openai_provider import OpenAISettings, generate_image as openai_generate_image, is_configured as openai_is_configured
+from webapp.openai_provider import OpenAIProviderError, OpenAISettings, generate_image as openai_generate_image, is_configured as openai_is_configured
 
 WEBAPP_TMP = BASE / "webapp" / "tmp"
 FINISH_LIBRARY_DIR = BASE / "webapp" / "data" / "finish_library"
@@ -104,23 +103,30 @@ class ProviderNotConfiguredError(ValueError):
     """Known local configuration error whose generated message is safe for the UI."""
 
     def __init__(self, ai_mode: str):
-        mode = normalize_ai_mode(ai_mode)
-        missing = "OPENAI_API_KEY" if mode == "premium" else "ARK_API_KEY"
-        super().__init__(f"선택한 {mode} 공급자의 {missing}를 프로젝트 .env에 설정해 주세요.")
+        normalize_ai_mode(ai_mode)
+        super().__init__("OPENAI_API_KEY를 프로젝트 .env에 설정한 뒤 앱을 다시 시작해 주세요. 빠른·정밀 생성과 AI 추출에 같은 OpenAI 키를 사용합니다.")
 
 
 def generate_ai_render(prompt: str, image_paths: list[Path], output_path: Path, label: str,
                        log_parts: list[str], *, job_id: str | None = None,
                        quality: str = "standard", ai_mode: str = "flash") -> Path:
-    """Preserve provider routing, but fail closed instead of reading local CLI credentials."""
+    """Legacy modes select OpenAI output quality, never another provider."""
     mode = normalize_ai_mode(ai_mode)
-    configured = openai_is_configured() if mode == "premium" else modelark_is_configured()
+    configured = openai_is_configured()
     if not configured:
         raise ProviderNotConfiguredError(mode)
-    with codex_image_lock:
-        result = (openai_generate_image(prompt, image_paths, output_path=output_path) if mode == "premium" else
-                  modelark_generate_image(prompt, image_paths, output_path=output_path, quality=quality))
-    provider = "openai" if mode == "premium" else "modelark"
+    image_quality = "high" if mode == "premium" else "low"
+    if job_id:
+        update_job(job_id, provider="openai", provider_model=OpenAISettings.from_env(required=False).public_summary()["models"]["image"],
+                   provider_quality=image_quality, provider_usage={}, provider_usage_available=False)
+    try:
+        with codex_image_lock:
+            result = openai_generate_image(prompt, image_paths, output_path=output_path, quality=image_quality)
+    except OpenAIProviderError as exc:
+        if job_id and exc.usage:
+            update_job(job_id, provider_usage=safe_provider_usage(exc.usage), provider_usage_available=True)
+        raise
+    provider = "openai"
     log_parts.append(f"{provider} {result['model']} 생성 완료: {output_path.name}")
     if job_id:
         usage = safe_provider_usage(result.get("usage"))
@@ -182,29 +188,19 @@ def mutation_origin_allowed(request: Request) -> bool:
     return normalized in allowed
 
 
-@app.get("/api/modelark/status")
-def modelark_status() -> dict[str, Any]:
-    """Expose active model IDs without ever returning the API key."""
-
-    return ModelArkSettings.from_env(required=False).public_summary()
-
-
 @app.get("/api/ai-providers/status")
 def ai_providers_status() -> dict[str, Any]:
-    """Return picker metadata without exposing either provider's API key."""
-
+    """One provider/key, two image quality levels; no credentials in metadata."""
+    summary = OpenAISettings.from_env(required=False).public_summary()
     return {
+        **summary,
         "default_mode": "flash",
         "modes": {
             "flash": {
-                "label": "Flash",
-                "provider": "BytePlus ModelArk",
-                **ModelArkSettings.from_env(required=False).public_summary(),
+                **summary, "label": "빠르게 · OpenAI", "quality": "low",
             },
             "premium": {
-                "label": "Premium",
-                "provider": "OpenAI",
-                **OpenAISettings.from_env(required=False).public_summary(),
+                **summary, "label": "정밀하게 · OpenAI", "quality": "high",
             },
         },
     }
@@ -753,11 +749,16 @@ def interior_compose_worker(
                     ai_mode=ai_mode, job_id=job_id,
                     quality="pro" if ai_mode == "premium" else "standard",
                 )
-            except Exception:
-                provider_call["status"] = "failed_or_unknown"
+            except Exception as provider_exc:
+                failed_job = get_job(job_id)
+                provider_call.update({
+                    "status": "not_dispatched" if isinstance(provider_exc, ProviderNotConfiguredError) else "failed_or_unknown",
+                    "provider": failed_job.get("provider"), "model": failed_job.get("provider_model"),
+                    "usage": failed_job.get("provider_usage") or {},
+                    "usage_available": bool(failed_job.get("provider_usage_available")),
+                })
                 update_job(job_id, provider_calls=provider_calls, quality_calls=quality_calls,
-                           provider=None, provider_model=None, provider_usage={},
-                           provider_usage_available=False, ready_for_report=False)
+                           ready_for_report=False)
                 raise
             provider_job = get_job(job_id)
             provider_call.update({
@@ -793,7 +794,9 @@ def interior_compose_worker(
             quality_calls.append({
                 "attempt": attempts, "status": "completed",
                 "provider_invoked": bool(quality_review.get("provider_invoked")),
+                "provider": quality_review.get("provider"),
                 "model": quality_review.get("model"), "usage": quality_review.get("usage") or {},
+                "usage_available": bool(quality_review.get("usage")),
                 "result_sha256": quality_review["result_sha256"],
                 "duration_seconds": quality_review.get("duration_seconds"),
             })
@@ -900,6 +903,7 @@ def ai_asset_extract_worker(
     original_filename: str,
 ) -> None:
     """Run slow generative extraction outside the upload request lifecycle."""
+    provider_call: dict[str, Any] | None = None
     try:
         from services import ai_asset, image_postprocess
 
@@ -907,12 +911,17 @@ def ai_asset_extract_worker(
         with Image.open(source_path) as source_file:
             source = ImageOps.exif_transpose(source_file).convert("RGBA")
             source.load()
-        api_key = (
-            OpenAISettings.from_env(required=False).api_key
-            if ai_mode == "premium"
-            else ModelArkSettings.from_env(required=False).api_key
-        )
-        extraction_quality = "high" if ai_mode == "premium" else "medium"
+        settings = OpenAISettings.from_env(required=False)
+        api_key = settings.api_key
+        if not api_key:
+            raise ProviderNotConfiguredError(ai_mode)
+        extraction_quality = "high" if normalize_ai_mode(ai_mode) == "premium" else "low"
+        provider_call = {"attempt": 1, "requested_ai_mode": ai_mode, "quality": extraction_quality,
+                         "status": "dispatched", "provider": "openai", "model": settings.public_summary()["models"]["image"],
+                         "usage": {}, "usage_available": False}
+        update_job(job_id, provider="openai", provider_model=settings.public_summary()["models"]["image"],
+                   provider_quality=extraction_quality, provider_invoked=True,
+                   provider_usage={}, provider_usage_available=False, provider_calls=[provider_call])
         extracted = ai_asset.extract_selected_asset(
             source,
             description,
@@ -922,25 +931,22 @@ def ai_asset_extract_worker(
             ai_mode=ai_mode,
         )
         metadata = extracted.info.get("provider_metadata") if isinstance(extracted.info, dict) else None
-        if (isinstance(metadata, dict) and metadata.get("provider") in {"openai", "modelark"}
+        if (isinstance(metadata, dict) and metadata.get("provider") == "openai"
                 and isinstance(metadata.get("model"), str)
-                and re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", metadata["model"])):
+                and re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", metadata["model"])
+                and api_key not in metadata["model"]):
             provider_name, provider_model = metadata["provider"], metadata["model"]
             provider_usage = safe_provider_usage(metadata.get("usage"))
             usage_available = bool(metadata.get("usage_available")) and bool(provider_usage)
         else:
             # Older extractors and test doubles return only a PIL image.
-            if ai_mode == "premium":
-                provider_name, provider_model = "openai", ai_asset.MODEL
-            else:
-                settings = ModelArkSettings.from_env(required=False)
-                provider_name = "modelark"
-                provider_model = settings.image_pro_model if extraction_quality == "high" else settings.image_model
+            provider_name, provider_model = "openai", settings.public_summary()["models"]["image"]
             provider_usage, usage_available = {}, False
+        provider_call.update(status="completed", model=provider_model, usage=provider_usage, usage_available=usage_available)
         update_job(
             job_id, provider=provider_name, provider_model=provider_model,
             provider_usage=provider_usage, provider_usage_available=usage_available,
-            provider_invoked=True,
+            provider_invoked=True, provider_calls=[provider_call],
         )
         final_image = image_postprocess.postprocess_image(extracted, auto_crop=True, feather_radius=1)
         if should_save:
@@ -971,6 +977,15 @@ def ai_asset_extract_worker(
                 result_url=path_to_url(result_path),
             )
     except Exception as exc:
+        if isinstance(exc, OpenAIProviderError) and exc.usage:
+            update_job(job_id, provider_usage=safe_provider_usage(exc.usage), provider_usage_available=True)
+        if provider_call is not None:
+            failed_job = get_job(job_id)
+            provider_call.update(usage=failed_job.get("provider_usage") or {},
+                                 usage_available=bool(failed_job.get("provider_usage_available")))
+            if provider_call["status"] == "dispatched":
+                provider_call["status"] = "failed_or_unknown"
+            update_job(job_id, provider_calls=[provider_call])
         finish_job_error(job_id, exc, [], "")
         update_job(job_id, stage_label="AI 에셋 추출 실패")
 

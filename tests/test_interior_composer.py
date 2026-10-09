@@ -301,6 +301,7 @@ def test_ai_asset_extraction_queues_box_and_description(tmp_path, monkeypatch):
 
 
 def test_ai_asset_extract_worker_saves_job_result(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only-not-a-real-key")
     source_path = tmp_path / "source.png"
     Image.new("RGBA", (96, 64), (190, 160, 120, 255)).save(source_path)
     monkeypatch.setattr(server.db, "DB_PATH", tmp_path / "worker.db")
@@ -335,12 +336,13 @@ def test_ai_asset_extract_worker_saves_job_result(tmp_path, monkeypatch):
 
 
 def test_ai_asset_worker_prefers_actual_provider_metadata_before_postprocessing(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only-not-a-real-key")
     source_path = tmp_path / "source.png"
     Image.new("RGBA", (96, 64), (190, 160, 120, 255)).save(source_path)
     monkeypatch.setattr(server.db, "DB_PATH", tmp_path / "worker-metadata.db")
     extracted = Image.new("RGBA", (96, 64), (190, 160, 120, 255))
     extracted.info["provider_metadata"] = {
-        "provider": "modelark", "model": "actual-pro-model",
+        "provider": "openai", "model": "actual-pro-model",
         "usage": {"total_tokens": 17, "secret_note": "discard this"},
         "usage_available": True,
     }
@@ -353,7 +355,7 @@ def test_ai_asset_worker_prefers_actual_provider_metadata_before_postprocessing(
                                    "Chair", "furniture", "interior-composer", "room.png")
     job = server.get_job(job_id)
     assert job["status"] == "done"
-    assert job["provider"] == "modelark"
+    assert job["provider"] == "openai"
     assert job["provider_model"] == "actual-pro-model"
     assert job["provider_usage"] == {"total_tokens": 17}
     assert job["provider_usage_available"] is True
@@ -545,7 +547,7 @@ def test_composer_repairs_once_and_preserves_both_raw_attempts(tmp_path, monkeyp
     def fake_generate(prompt, inputs, output_path, label, log_parts, **kwargs):
         prompts.append(prompt)
         output_path.write_bytes(png_bytes((10 * len(prompts), 20, 30, 255)))
-        server.update_job(job_id, provider="modelark", provider_model="test-model", provider_usage={"total_tokens": 5}, provider_usage_available=True)
+        server.update_job(job_id, provider="openai", provider_model="test-model", provider_usage={"total_tokens": 5}, provider_usage_available=True)
         return output_path
     reviews = iter([
         {"status": "failed", "issues": ["asset_duplicated"], "repair_instruction": "Remove duplicate furniture.", "provider_invoked": True, "model": "qa-model", "usage": {"total_tokens": 3}},
@@ -581,7 +583,7 @@ def test_failed_repair_retains_first_usage_and_marks_second_charge_unknown(tmp_p
         if len(calls) == 2:
             raise RuntimeError("provider request failed")
         output_path.write_bytes(png_bytes((10, 20, 30, 255)))
-        server.update_job(job_id, provider="modelark", provider_model="test-model",
+        server.update_job(job_id, provider="openai", provider_model="test-model",
                           provider_usage={"total_tokens": 51}, provider_usage_available=True)
         return output_path
     monkeypatch.setattr(server, "generate_ai_render", fake_generate)

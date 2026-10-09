@@ -1,9 +1,9 @@
-param([switch]$Quiet)
+param([switch]$Quiet, [string]$DestinationDirectory)
 
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot)).TrimEnd('\')
-$desktop = [Environment]::GetFolderPath('Desktop')
-if (-not $desktop -or -not (Test-Path -LiteralPath $desktop)) { throw 'Desktop folder is unavailable.' }
+$desktop = if ($DestinationDirectory) { [IO.Path]::GetFullPath($DestinationDirectory) } else { [Environment]::GetFolderPath('Desktop') }
+if (-not $desktop -or -not (Test-Path -LiteralPath $desktop -PathType Container)) { throw 'Shortcut destination directory is unavailable.' }
 $shell = New-Object -ComObject WScript.Shell
 $entries = @(
     @{ name='Interior Composer START'; file='start-composer.bat'; icon=137 },

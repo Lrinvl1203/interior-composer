@@ -103,7 +103,7 @@ export default function InteriorConsultationReport({ reportId }: { reportId: str
             <div><dt>공간</dt><dd>{report.space_type}</dd></div>
             <div><dt>버전</dt><dd>VERSION {String(report.version).padStart(2, "0")}</dd></div>
             <div><dt>발행일</dt><dd>{reportDate(report.created_at)}</dd></div>
-            <div><dt>생성 모드</dt><dd>{report.ai_mode === "premium" ? "Premium" : "Flash"}</dd></div>
+            <div><dt>생성 품질</dt><dd>{report.ai_mode === "premium" ? "정밀하게" : "빠르게"}</dd></div>
             <div><dt>검수</dt><dd>{report.verification?.manual_visual_review ? "사용자 직접 확인" : report.verification?.quality_status === "passed" ? "AI 시각 검수 통과" : "이전 저장 기록 · 확인 필요"}</dd></div>
           </dl>
         </div>

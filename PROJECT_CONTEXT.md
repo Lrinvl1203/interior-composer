@@ -2,6 +2,14 @@
 
 이 파일과 저장소의 현재 Git 상태를 기준으로 작업하세요. 출발 프로젝트의 다른 대화 맥락이나 개인 Codex 스킬에 의존하지 않습니다.
 
+## 최신 제품 결정 — 2026-10-10
+
+- 받는 사람은 비전문가입니다. `CODEX_INSTALL.md`를 읽으라는 한 문장으로 Codex가 소스 받기·필수 런타임·설치·바탕화면 아이콘·실행 확인을 맡습니다. Python/Node/Git 수동 설치를 사용자에게 넘기지 않습니다.
+- API 설정은 나중입니다. 설치 중 키 입력·가입·결제·유료 모델 테스트를 요구하지 않습니다. 키가 없으면 작업 화면·입력 저장은 가능하고 AI 요청만 차단합니다.
+- 생성·가구 AI 추출·시각 검수는 **OpenAI만** 사용합니다. `OPENAI_API_KEY` 하나, 이미지 `gpt-image-2`, 검수 `gpt-5-mini`가 현재 기본값입니다. 설정으로 모델을 바꿀 수 있습니다.
+- 내부 `flash/premium` 값은 기존 초안/보고서 호환용이며 이제 같은 OpenAI 이미지 모델의 low/high 품질입니다. 다른 공급자로 해석하지 않습니다. 런처는 상위 Codex 프로세스의 키를 가져오지 않고 이 설치의 `.env`를 사용합니다.
+- 자동 설치는 Windows x64 대상, 사용자 공간 런타임의 공식 SHA256 검증, 포트 충돌 회피, 소유 프로세스 확인과 기존 사용자 데이터 보존이 필수입니다. 전역 PATH/레지스트리·보안 설정을 바꾸지 않습니다.
+
 ## 작업 범위
 
 - 대상: 이 standalone `interior-composer` 저장소. 먼저 현재 디렉터리와 `git status --short`, `git log -1`을 확인합니다.
@@ -15,9 +23,10 @@
 - `frontend/lib/composerDraft.ts`: IndexedDB 파일/초안·결과 저장, 리비전 비교 트랜잭션.
 - `webapp/server.py`: Composer API/잡 워커/정본 보고서. 불필요한 CAD·영상·SaaS API는 제외.
 - `webapp/image_align.py`, `composition_quality.py`: 2D 좌표 정렬·시각 검수. 3D 검증이 아님.
-- `webapp/interior_report.py`: PDF. `modelark.py`·`openai_provider.py`: 서버 측 공급자 호출.
+- `webapp/interior_report.py`: PDF. `openai_provider.py`: 유일한 활성 공급자 호출. `modelark.py`는 사용하지 않는 과거 추출 근거이며 앱이나 설치 과정에서 호출하지 않습니다.
 - `room-asset-composer/services/`: 로컬 에셋 저장·추출·알파 처리.
 - `scripts/launcher.ps1`: 프로세스 소유권 검사·시작/종료. 기본 웹3100/API18877.
+- `scripts/bootstrap.ps1`·`runtime.ps1`: Git 없는 소스 ZIP에서도 필수 런타임부터 빌드·시작까지 처리. 자동 선택 포트는 `.local/ports.json`, 설치 성공/소스 정합 marker는 `.local/bootstrap-marker.json`입니다.
 - `webapp/extraction_provenance.json`: 추출한 원본 정의·파일 해시. 이후 변경을 원본과 같다고 잘못 표현하지 않습니다.
 
 ## 유지할 조건
@@ -34,5 +43,7 @@
 ## 검증 및 권한
 
 README의 Python 회귀 검사, frontend 타입·테스트·빌드, 공개 트리 검사를 모두 수행합니다. 설치 변경 시 새 clone과 실행기 START/STOP을 다시 확인합니다. 테스트의 외부 AI 호출은 기본적으로 금지하며 명시적인 예산 승인이 있을 때만 실행합니다. 스모크 fixture는 가상 공급자이며 실제 AI 결과 증거가 아닙니다.
+
+필수 프로그램 없는 재현은 별도 빈 폴더의 `bootstrap.ps1 -ForcePortableRuntimes -NoBrowser`로 합니다. 기존 사람의 바탕화면을 테스트로 덮어쓰지 말고 바로가기는 테스트 디렉터리에 생성해 대상 경로를 확인합니다. 과거 `export_backend.py`는 재실행하면 공급자 전환을 되돌리므로 폐기된 안내 stub입니다.
 
 이번 초기 전달에는 새 로컬 Git/공개 저장소 생성과 최초 푸시가 사용자 승인되었습니다. 이후 커밋·푸시·배포·외부 호출·자료 삭제는 그 작업의 사용자 지시 범위를 확인하세요. 완료 보고에는 변경 파일, 실제 검사 결과, 미검증 기능, 커밋 상태를 남기세요.

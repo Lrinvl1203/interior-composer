@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import BeforeAfterSlider from "@/components/journey/BeforeAfterSlider";
+import { openaiKeyConfigured } from "@/lib/providerStatus";
 import { ComposerDraftConflictError, composerInputKey, readComposerDraft, writeComposerDraft, type ComposerDraft, type CompositionReview, type CompositionSnapshot, type SavedComposerResult } from "@/lib/composerDraft";
 import styles from "./InteriorComposer.module.css";
 
@@ -111,7 +112,10 @@ export default function InteriorComposer() {
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [request, setRequest] = useState("");
   const [assetAiMode, setAssetAiMode] = useState<AiMode>("flash");
-  const [composeAiMode, setComposeAiMode] = useState<AiMode>("premium");
+  const [composeAiMode, setComposeAiMode] = useState<AiMode>("flash");
+  const [apiConfigured, setApiConfigured] = useState(false);
+  const [apiStatus, setApiStatus] = useState("OpenAI 설정을 확인하고 있습니다. API 키 없이도 작업 화면은 사용할 수 있습니다.");
+  const [apiStatusEpoch, setApiStatusEpoch] = useState(0);
   const [working, setWorking] = useState(false);
   const [status, setStatus] = useState("STEP 1과 STEP 2를 완료하면 부분 합성을 시작할 수 있습니다.");
   const [savedResult, setSavedResult] = useState<SavedComposerResult | null>(null);
@@ -152,6 +156,24 @@ export default function InteriorComposer() {
   const saveSequence = useRef(0);
   const storageRevisionRef = useRef(0);
   const storageWriteBlockedRef = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/ai-providers/status", { cache: "no-store" }).then(async response => {
+      if (!response.ok) throw new Error("provider status unavailable");
+      const configured = openaiKeyConfigured(await response.json());
+      if (!active) return;
+      setApiConfigured(configured);
+      setApiStatus(configured
+        ? "OpenAI 키가 설정되어 있습니다. 생성·추출·시각 검수는 모두 OpenAI를 사용하며 실제 모델 권한은 첫 요청 때 확인합니다."
+        : "설치 완료 · API 연결은 나중에 해도 됩니다. 사진·마감 선택과 작업 저장은 지금 사용할 수 있고, AI 생성·추출·검수는 OpenAI 키를 설정한 뒤 사용할 수 있습니다.");
+    }).catch(() => {
+      if (!active) return;
+      setApiConfigured(false);
+      setApiStatus("OpenAI 설정 상태를 확인하지 못했습니다. 입력은 유지되며 AI 요청은 잠시 중단합니다. 연결 상태를 다시 확인해 주세요.");
+    });
+    return () => { active = false; };
+  }, [apiStatusEpoch]);
 
   useEffect(() => {
     let active = true;
@@ -455,7 +477,7 @@ export default function InteriorComposer() {
   };
 
   const extractAsset = async () => {
-    if (!assetSource || !assetBox || extracting || pendingExtraction || saveConflict || (extractionMode === "ai" && !assetDescription.trim())) return;
+    if (!assetSource || !assetBox || extracting || pendingExtraction || saveConflict || (extractionMode === "ai" && (!assetDescription.trim() || !apiConfigured))) return;
     setExtracting(true);
     setAssetMessage(extractionMode === "ai"
       ? "AI가 박스와 설명을 함께 읽고 선택한 에셋만 투명 PNG로 추출하고 있습니다."
@@ -556,7 +578,7 @@ export default function InteriorComposer() {
   };
 
   const generate = async () => {
-    if (!beforeFile || (!selectedAssetIds.length && !selectedFinishes.length) || working || pendingComposition || saveConflict) return;
+    if (!beforeFile || (!selectedAssetIds.length && !selectedFinishes.length) || working || pendingComposition || saveConflict || !apiConfigured) return;
     setWorking(true);
     setRejectedResult(null);
     setStatus("선택 에셋과 마감재를 검증하고 있습니다.");
@@ -587,7 +609,7 @@ export default function InteriorComposer() {
   };
 
   const requestGenerate = () => {
-    if (!beforeFile || (!selectedAssetIds.length && !selectedFinishes.length) || working || pendingComposition || !draftLoaded || saveConflict) return;
+    if (!beforeFile || (!selectedAssetIds.length && !selectedFinishes.length) || working || pendingComposition || !draftLoaded || saveConflict || !apiConfigured) return;
     confirmTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setShowComposeConfirm(true);
   };
@@ -670,6 +692,7 @@ export default function InteriorComposer() {
       <p>가구 에셋과 마감재를 준비한 뒤 Before 공간에 적용합니다. 생성 후 수량·배치·구도를 검사하고, 검수한 결과와 생성 당시 선택 내용을 함께 저장합니다.</p>
     </header>
     <p className={styles.saveStatus} role="status" aria-live="polite">{saveStatus}</p>
+    <div className={styles.saveStatus}><p role="status" aria-live="polite">{apiStatus}</p>{!apiConfigured && <button type="button" className={styles.secondaryButton} onClick={() => setApiStatusEpoch(value => value + 1)}>연결 상태 다시 확인</button>}</div>
     {saveConflict && <div className={styles.saveStatus} role="alert"><p>이 탭의 내용과 생성 결과는 화면에 남아 있습니다. 최신 저장본을 불러오면 이 탭의 저장되지 않은 편집은 바뀝니다.</p><button type="button" className={styles.secondaryButton} onClick={() => window.location.reload()}>최신 저장본 불러오기</button></div>}
 
     <div className={styles.stepRail} aria-label="합성 진행 단계">
@@ -694,13 +717,13 @@ export default function InteriorComposer() {
             </button>
           </div>
           {extractionMode === "ai" && <div className={styles.assetModeBlock}>
-            <div className={styles.modeLabel}><b>AI 추출 모델</b><small>에셋 추출에만 적용됩니다.</small></div>
-            <div className={styles.modePicker} role="group" aria-label="에셋 AI 추출 모델">
+            <div className={styles.modeLabel}><b>OpenAI 추출 품질</b><small>에셋 추출에만 적용됩니다.</small></div>
+            <div className={styles.modePicker} role="group" aria-label="에셋 AI 추출 품질">
               <button type="button" aria-pressed={assetAiMode === "flash"} onClick={() => setAssetAiMode("flash")}>
-                <b>Flash <span>(추천)</span></b><small>빠른 추출 · 예상 15~40초</small>
+                <b>빠르게 <span>· OpenAI</span></b><small>가벼운 품질로 추출 · 유료 API</small>
               </button>
               <button type="button" aria-pressed={assetAiMode === "premium"} onClick={() => setAssetAiMode("premium")}>
-                <b>Premium</b><small>정밀 경계·디테일 · 예상 40~90초</small>
+                <b>정밀하게 <span>· OpenAI</span></b><small>높은 품질로 추출 · 유료 API</small>
               </button>
             </div>
           </div>}
@@ -725,7 +748,7 @@ export default function InteriorComposer() {
                 <textarea value={assetDescription} onChange={(event) => setAssetDescription(event.target.value)} rows={2} placeholder="예: 월넛 프레임과 베이지 패브릭의 1인 암체어" />
               </label>
             </div>
-            <button type="button" className={styles.primaryButton} onClick={() => void extractAsset()} disabled={extracting || Boolean(pendingExtraction) || saveConflict || !assetBox || (extractionMode === "ai" && !assetDescription.trim())}>
+            <button type="button" className={styles.primaryButton} onClick={() => void extractAsset()} disabled={extracting || Boolean(pendingExtraction) || saveConflict || !assetBox || (extractionMode === "ai" && (!assetDescription.trim() || !apiConfigured))}>
               {extracting ? <LoaderCircle className={styles.spin} aria-hidden="true" /> : <Wand2 aria-hidden="true" />}
               {extracting ? "추출 중" : extractionMode === "ai" ? "AI로 에셋 추출" : "SAM 박스 추출"}
             </button>
@@ -823,10 +846,10 @@ export default function InteriorComposer() {
         <StepHeader number="03" title="After 생성" description="부분 합성하고 자동 기준을 점검합니다." />
 
         <div className={styles.block}>
-          <div className={styles.blockTitle}><Wand2 aria-hidden="true" /><div><b>이미지 모델</b><small>동일 입력과 동일한 제약 조건 사용</small></div></div>
-          <div className={styles.modePicker} role="group" aria-label="After 이미지 생성 모델">
-            <button type="button" aria-pressed={composeAiMode === "flash"} onClick={() => setComposeAiMode("flash")}><b>Flash</b><small>빠른 배치 확인 · 예상 30~60초</small></button>
-            <button type="button" aria-pressed={composeAiMode === "premium"} onClick={() => setComposeAiMode("premium")}><b>Premium <span>(추천)</span></b><small>정밀 시점·재질 합성 · 예상 1~2분</small></button>
+          <div className={styles.blockTitle}><Wand2 aria-hidden="true" /><div><b>OpenAI 이미지 품질</b><small>같은 모델에서 생성 품질을 선택합니다.</small></div></div>
+          <div className={styles.modePicker} role="group" aria-label="After 이미지 생성 품질">
+            <button type="button" aria-pressed={composeAiMode === "flash"} onClick={() => setComposeAiMode("flash")}><b>빠르게 <span>· OpenAI</span></b><small>가벼운 품질로 방향 확인 · 유료 API</small></button>
+            <button type="button" aria-pressed={composeAiMode === "premium"} onClick={() => setComposeAiMode("premium")}><b>정밀하게 <span>· OpenAI</span></b><small>높은 품질로 최종 이미지 · 유료 API</small></button>
           </div>
           <div className={styles.summary}>
             <span><b>{selectedAssetIds.length}</b> 가구</span>
@@ -834,7 +857,7 @@ export default function InteriorComposer() {
             <span><b>{placements.length}</b> 지정 위치</span>
           </div>
           {!selectedAssetIds.length && selectedFinishes.length > 0 && <p className={styles.finishOnlyNotice}><ShieldCheck aria-hidden="true" />가구·소품은 유지하고 선택한 마감재만 적용합니다.</p>}
-          <button type="button" className={styles.generateButton} disabled={!beforeFile || (!selectedAssetIds.length && !selectedFinishes.length) || working || Boolean(pendingComposition) || saveConflict} onClick={requestGenerate}>
+          <button type="button" className={styles.generateButton} disabled={!beforeFile || (!selectedAssetIds.length && !selectedFinishes.length) || working || Boolean(pendingComposition) || saveConflict || !apiConfigured} onClick={requestGenerate}>
             {working ? <LoaderCircle className={styles.spin} aria-hidden="true" /> : <Sparkles aria-hidden="true" />}
             {working ? "부분 합성 진행 중" : "After 부분 합성 시작"}
           </button>

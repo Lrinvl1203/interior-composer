@@ -1,8 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 /** Parse only the non-secret API port; never export dotenv keys to the client. */
-export function backendPortFromSettings(environmentValue: string | undefined, dotenvText = ""): number {
+export function backendPortFromSettings(environmentValue: string | undefined, dotenvText = "", savedPorts?: unknown): number {
   let raw = environmentValue?.trim();
+  if (!raw && savedPorts && typeof savedPorts === "object" && !Array.isArray(savedPorts)) {
+    const value = (savedPorts as Record<string, unknown>).backend;
+    if (value !== undefined) raw = String(value);
+  }
   if (!raw) {
     const line = dotenvText.split(/\r?\n/).find(row => /^\s*INTERIOR_BACKEND_PORT\s*=/.test(row));
     if (line) {
@@ -19,5 +24,11 @@ export function backendPortFromSettings(environmentValue: string | undefined, do
 
 export function readBackendPort(dotenvPath: string): number {
   const text = existsSync(dotenvPath) ? readFileSync(dotenvPath, "utf8") : "";
-  return backendPortFromSettings(process.env.INTERIOR_BACKEND_PORT, text);
+  const savedPath = join(dirname(dotenvPath), ".local", "ports.json");
+  const savedPorts = existsSync(savedPath) ? parseSavedPorts(readFileSync(savedPath, "utf8")) : undefined;
+  return backendPortFromSettings(process.env.INTERIOR_BACKEND_PORT, text, savedPorts);
+}
+
+export function parseSavedPorts(text: string): unknown {
+  return JSON.parse(text.replace(/^\uFEFF/, ""));
 }

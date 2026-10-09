@@ -1,111 +1,88 @@
-param([switch]$Quiet)
+param([switch]$Quiet, [switch]$ForcePortableRuntimes)
 
 $ErrorActionPreference = 'Stop'
-$root = Split-Path -Parent $PSScriptRoot
-$venvPython = Join-Path $root '.venv\Scripts\python.exe'
-$requirements = Join-Path $root 'requirements.txt'
+. (Join-Path $PSScriptRoot 'runtime.ps1')
+$root = $script:ComposerRoot
+$venv = Join-Path $root '.venv\Scripts\python.exe'
 $frontend = Join-Path $root 'frontend'
+$local = Join-Path $root '.local'
+
+function Assert-NoOwnedServices {
+    foreach ($name in @('backend','frontend')) {
+        $path = Join-Path $root ".local\launcher\$name.json"
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { continue }
+        $record = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+        if ($record.projectRoot -ne [IO.Path]::GetFullPath($root).TrimEnd('\')) { continue }
+        $process = Get-CimInstance Win32_Process -Filter "ProcessId = $($record.processId)" -ErrorAction SilentlyContinue
+        if ($process -and $process.CreationDate.ToUniversalTime().Ticks.ToString() -eq $record.creationTicks -and $process.CommandLine -eq $record.commandLine) {
+            throw "Owned $name service is running. Use bootstrap.ps1 to update safely; direct install will not mutate a live service."
+        }
+    }
+}
 
 function Invoke-Checked([string]$Executable, [string[]]$Arguments, [string]$Directory) {
     Push-Location -LiteralPath $Directory
+    $previousErrorAction = $ErrorActionPreference
     try {
-        & $Executable @Arguments
+        # Native tools may write ordinary progress/warnings to stderr in Windows PowerShell 5.
+        $ErrorActionPreference = 'Continue'
+        if ($Quiet) { & $Executable @Arguments | Out-Null }
+        else { & $Executable @Arguments }
         if ($LASTEXITCODE -ne 0) { throw "$Executable failed with exit code $LASTEXITCODE" }
-    } finally { Pop-Location }
-}
-
-function Invoke-PythonProbe([string]$Executable, [string[]]$Arguments) {
-    try {
-        $start = New-Object Diagnostics.ProcessStartInfo
-        $start.FileName = $Executable
-        $start.Arguments = (($Arguments | ForEach-Object {
-            if ($_ -match '[\s"]') { '"' + $_.Replace('"', '\"') + '"' } else { $_ }
-        }) -join ' ')
-        $start.UseShellExecute = $false
-        $start.CreateNoWindow = $true
-        $start.RedirectStandardOutput = $true
-        $start.RedirectStandardError = $true
-        $process = [Diagnostics.Process]::Start($start)
-        if (-not $process.WaitForExit(10000)) {
-            $process.Kill()
-            return [pscustomobject]@{ exitCode=1; stdout=''; stderr='Python probe timed out.' }
-        }
-        return [pscustomobject]@{
-            exitCode=$process.ExitCode
-            stdout=$process.StandardOutput.ReadToEnd().Trim()
-            stderr=$process.StandardError.ReadToEnd().Trim()
-        }
-    } catch {
-        return [pscustomobject]@{ exitCode=1; stdout=''; stderr=$_.Exception.Message }
     } finally {
-        if ($process) { $process.Dispose() }
+        $ErrorActionPreference = $previousErrorAction
+        Pop-Location
     }
-}
-
-function Get-SupportedPython {
-    $candidates = New-Object 'System.Collections.Generic.List[string]'
-    $pyCommand = Get-Command py.exe -ErrorAction SilentlyContinue
-    if ($pyCommand) {
-        $listed = Invoke-PythonProbe $pyCommand.Source @('-0p')
-        if ($listed.exitCode -eq 0) {
-            $pathPattern = '^\s+-V:\S+\s+(?:\*\s+)?(.+?python(?:3)?\.exe)\s*$'
-            $rows = @($listed.stdout -split "`r?`n" | Where-Object { $_ -match $pathPattern })
-            foreach ($row in ($rows | Where-Object { $_ -match '3\.12' })) {
-                [void]$candidates.Add(([regex]::Match($row, $pathPattern).Groups[1].Value))
-            }
-            foreach ($row in ($rows | Where-Object { $_ -match '3\.11' })) {
-                [void]$candidates.Add(([regex]::Match($row, $pathPattern).Groups[1].Value))
-            }
-            foreach ($row in ($rows | Where-Object { $_ -notmatch '3\.12|3\.11' })) {
-                [void]$candidates.Add(([regex]::Match($row, $pathPattern).Groups[1].Value))
-            }
-        }
-    }
-    foreach ($name in @('python.exe', 'python3.exe')) {
-        $command = Get-Command $name -ErrorAction SilentlyContinue
-        if ($command -and $command.Source -notmatch '\\WindowsApps\\') { [void]$candidates.Add($command.Source) }
-    }
-    foreach ($candidate in ($candidates | Select-Object -Unique)) {
-        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
-        $probe = Invoke-PythonProbe $candidate @('-c', 'import sys; print(sys.version_info.major, sys.version_info.minor)')
-        if ($probe.exitCode -ne 0 -or $probe.stdout -notmatch '^3\s+(\d+)$') { continue }
-        if ([int]$Matches[1] -ge 11 -and [int]$Matches[1] -le 13) { return $candidate }
-    }
-    return $null
 }
 
 try {
-    if (-not (Test-Path -LiteralPath $requirements)) { throw "Missing requirements.txt: $requirements" }
-    if (-not (Test-Path -LiteralPath (Join-Path $frontend 'package-lock.json'))) { throw 'Missing frontend/package-lock.json; npm ci requires the lockfile.' }
-    $existingVenv = Test-Path -LiteralPath $venvPython -PathType Leaf
-    if ($existingVenv) {
-        $venvProbe = Invoke-PythonProbe $venvPython @('-c', 'import sys; print(sys.version_info.major, sys.version_info.minor)')
-        if ($venvProbe.exitCode -ne 0 -or $venvProbe.stdout -notmatch '^3\s+(\d+)$' -or [int]$Matches[1] -lt 11 -or [int]$Matches[1] -gt 13) {
-            throw 'Existing .venv is unusable or uses Python outside the supported 3.11–3.13 range. Inspect it before reinstalling.'
+    Assert-WindowsX64
+    Assert-NoOwnedServices
+    if (-not (Test-Path -LiteralPath (Join-Path $root 'requirements.txt') -PathType Leaf)) { throw 'Missing requirements.txt.' }
+    if (-not (Test-Path -LiteralPath (Join-Path $frontend 'package-lock.json') -PathType Leaf)) { throw 'Missing frontend/package-lock.json.' }
+    $lockHash = (Get-FileHash -LiteralPath (Join-Path $frontend 'package-lock.json') -Algorithm SHA256).Hash.ToLowerInvariant()
+    $lockHashPath = Join-Path $local 'npm-lock.sha256'
+    $installedHash = if (Test-Path -LiteralPath $lockHashPath -PathType Leaf) { (Get-Content -LiteralPath $lockHashPath -Raw).Trim() } else { '' }
+    if (-not $Quiet) { Write-Output 'Checking compatible Python (project-local verified download if needed)...' }
+    $python = Get-CompatiblePython -ForcePortable:$ForcePortableRuntimes
+    if (-not $Quiet) { Write-Output 'Checking compatible Node.js (project-local verified download if needed)...' }
+    $node = Get-CompatibleNode -ForcePortable:$ForcePortableRuntimes
+    $nodeDir = Split-Path -Parent $node.node
+    $oldPath = $env:PATH
+    $oldPipCache = $env:PIP_CACHE_DIR
+    $oldNpmCache = $env:npm_config_cache
+    $env:PATH = "$nodeDir;$oldPath"
+    $env:PIP_CACHE_DIR = Join-Path $script:RuntimeRoot 'pip-cache'
+    $env:npm_config_cache = Join-Path $script:RuntimeRoot 'npm-cache'
+    try {
+        if (-not (Test-Path -LiteralPath $venv -PathType Leaf)) {
+            if (Test-Path -LiteralPath (Join-Path $root '.venv')) { throw 'Existing incomplete .venv was not overwritten; inspect it before retrying.' }
+            Invoke-Checked $python @('-m', 'venv', (Join-Path $root '.venv')) $root
         }
-        Write-Output "Using existing Python environment: $venvPython"
-    } else {
-        $pythonExecutable = Get-SupportedPython
-        if (-not $pythonExecutable) { throw 'Python 3.12 (recommended) or another supported Python 3.11–3.13 installation is required.' }
-        Write-Output "Using Python: $pythonExecutable"
+        if (-not $Quiet) { Write-Output 'Installing Python dependencies into project .venv...' }
+        Invoke-Checked $venv @('-m', 'pip', 'install', '--upgrade', 'pip>=26.2,<27') $root
+        Invoke-Checked $venv @('-m', 'pip', 'install', '-r', (Join-Path $root 'requirements.txt')) $root
+        if (-not (Test-Path -LiteralPath (Join-Path $frontend 'node_modules\next\dist\bin\next') -PathType Leaf) -or $installedHash -ne $lockHash) {
+            if (-not $Quiet) { Write-Output 'Installing frontend dependencies from package-lock.json...' }
+            Invoke-Checked $node.npm @('ci') $frontend
+            [void](New-Item -ItemType Directory -Path $local -Force)
+            Set-Content -LiteralPath $lockHashPath -Value $lockHash -Encoding ASCII
+        }
+    } finally {
+        $env:PATH = $oldPath
+        $env:PIP_CACHE_DIR = $oldPipCache
+        $env:npm_config_cache = $oldNpmCache
     }
-    $nodeVersion = (& node.exe -p 'process.versions.node').Trim()
-    if ($LASTEXITCODE -ne 0 -or [version]$nodeVersion -lt [version]'22.0.0') { throw 'Node.js 22 or newer is required.' }
-    $npm = (Get-Command npm.cmd -ErrorAction Stop).Source
-    if (-not $existingVenv) {
-        Invoke-Checked $pythonExecutable @('-m', 'venv', (Join-Path $root '.venv')) $root
-    }
-    Invoke-Checked $venvPython @('-m', 'pip', 'install', '--upgrade', 'pip>=26.2,<27') $root
-    Invoke-Checked $venvPython @('-m', 'pip', 'install', '-r', $requirements) $root
-    Invoke-Checked $npm @('ci') $frontend
     $envPath = Join-Path $root '.env'
     $examplePath = Join-Path $root '.env.example'
     if (-not (Test-Path -LiteralPath $envPath) -and (Test-Path -LiteralPath $examplePath)) {
         Copy-Item -LiteralPath $examplePath -Destination $envPath
-        Write-Output 'Created .env from .env.example. Add your own API keys only if needed.'
+        if (-not $Quiet) { Write-Output 'Created .env from .env.example; no API key is required for installation.' }
     }
-    Write-Output 'Interior Composer installed. Run start-composer.bat to start local servers.'
-    Write-Output 'Optional SAM/large GPU dependencies are not installed by default.'
+    $runtimeRecord = [ordered]@{ node=$node.node; npm=$node.npm; python=$venv; portableNode=$node.portable; created=(Get-Date).ToUniversalTime().ToString('o') }
+    [void](New-Item -ItemType Directory -Path $local -Force)
+    $runtimeRecord | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $local 'runtime-paths.json') -Encoding UTF8
+    if (-not $Quiet) { Write-Output 'Interior Composer dependencies installed locally. API key can be added later.' }
 } catch {
     [Console]::Error.WriteLine($_.Exception.Message)
     exit 1

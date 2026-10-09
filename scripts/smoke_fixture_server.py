@@ -75,6 +75,11 @@ def main():
     server.verify_composition = fixture_review
     @server.app.middleware("http")
     async def fixture_marker(request, call_next):
+        if request.url.path == "/api/ai-providers/status":
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"provider": "OpenAI", "configured": True,
+                                 "models": {"image": "offline-not-ai", "vision": "offline-not-ai"}},
+                                headers={"X-Composer-QA-Fixture": "offline-not-ai"})
         response = await call_next(request)
         response.headers["X-Composer-QA-Fixture"] = "offline-not-ai"
         return response

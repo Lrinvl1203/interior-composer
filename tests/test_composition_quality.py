@@ -1,13 +1,14 @@
 import base64
 import io
 import json
+from types import SimpleNamespace
 
 import httpx
 import pytest
 from PIL import Image
 
 from webapp import composition_quality as quality
-from webapp import modelark
+from webapp import openai_provider
 
 
 def _check(matches=True, confidence=0.96, evidence="Compared visible edges and objects."):
@@ -35,30 +36,37 @@ def _answer(rows=None):
 
 @pytest.fixture
 def inspection(monkeypatch, tmp_path):
-    """Mock the actual HTTP boundary, including failures; no paid calls are possible."""
+    """Mock the SDK response boundary; the global network guard forbids paid calls."""
     source = tmp_path / "source.png"
     after = tmp_path / "after.png"
     asset = tmp_path / "asset.png"
     Image.new("RGB", (1600, 900), "navy").save(source)
     Image.new("RGB", (1600, 900), "green").save(after)
     Image.new("RGBA", (1200, 500), (0, 0, 0, 0)).save(asset)
-    settings = modelark.ModelArkSettings(api_key="test-super-secret")
-    monkeypatch.setattr(modelark.ModelArkSettings, "from_env", lambda **kwargs: settings)
+    settings = openai_provider.OpenAISettings(api_key="test-super-secret")
+    monkeypatch.setattr(openai_provider.OpenAISettings, "from_env", lambda **kwargs: settings)
     state = {"answer": _answer(), "calls": [], "usage": {"prompt_tokens": 200, "completion_tokens": 100, "total_tokens": 300}}
 
-    def fake_http(method, url, **kwargs):
-        state["calls"].append({"method": method, "url": url, **kwargs})
+    def fake_create(**kwargs):
+        state["calls"].append(kwargs)
         if state.get("error"):
             raise state["error"]
         if state.get("http_status", 200) != 200:
-            return httpx.Response(state["http_status"], json={"error": {"message": "test-super-secret https://private.invalid/token"}})
+            raise RuntimeError("test-super-secret https://private.invalid/token")
         content = state.get("content", json.dumps(state["answer"]))
-        payload = {"choices": [{"finish_reason": state.get("finish_reason", "stop"), "message": {"content": content}}]}
-        if state["usage"] is not None:
-            payload["usage"] = state["usage"]
-        return httpx.Response(200, json=payload)
+        parts = [SimpleNamespace(type="output_text", text=content)]
+        if state.get("refusal"):
+            parts.append(SimpleNamespace(type="refusal", refusal="test-super-secret"))
+        return SimpleNamespace(status=state.get("status", "completed"), error=state.get("response_error"),
+                               incomplete_details=state.get("incomplete_details"), usage=state["usage"],
+                               model=settings.vision_model,
+                               output=[SimpleNamespace(type="message", status=state.get("message_status", "completed"), content=parts)])
 
-    monkeypatch.setattr(modelark.httpx, "request", fake_http)
+    def fake_client(**kwargs):
+        state["client_options"] = kwargs
+        return SimpleNamespace(responses=SimpleNamespace(create=fake_create))
+
+    monkeypatch.setattr(openai_provider, "OpenAI", fake_client)
     state.update(source=source, after=after, asset=asset, settings=settings)
 
     def run(assets=None, snapshot=None):
@@ -78,8 +86,9 @@ def test_success_requires_explicit_confident_visual_checks(inspection):
     assert result["inventory"][0]["count_status"] == "passed"
     assert result["inventory"][0]["placement"]["status"] == "not_applicable"
     assert result["checks"]["source_objects"]["status"] == "not_applicable"
-    assert result["method"] == "modelark_vision"
-    assert result["model"] == modelark.DEFAULT_TEXT_MODEL
+    assert result["method"] == "openai_vision"
+    assert result["provider"] == "openai"
+    assert result["model"] == openai_provider.DEFAULT_VISION_MODEL
     assert result["usage"]["total_tokens"] == 300
     assert result["usage_available"] is True
 
@@ -289,7 +298,7 @@ def test_no_usage_does_not_fabricate_billing(inspection):
 
 
 def test_no_provider_config_does_not_make_a_request(inspection, monkeypatch):
-    monkeypatch.setattr(modelark.ModelArkSettings, "from_env", lambda **kwargs: modelark.ModelArkSettings(api_key=""))
+    monkeypatch.setattr(openai_provider.OpenAISettings, "from_env", lambda **kwargs: openai_provider.OpenAISettings(api_key=""))
     result = inspection["run"]()
     assert result["status"] == "unverified"
     assert result["issues"][0]["code"] == "vision_unavailable"
@@ -317,7 +326,7 @@ def test_response_inventory_ids_must_match_all_selected_ids(inspection):
 
 
 def test_truncated_model_output_is_not_accepted_even_when_json_parses(inspection):
-    inspection["finish_reason"] = "length"
+    inspection["status"] = "incomplete"
     assert inspection["run"]()["status"] == "unverified"
 
 
@@ -336,13 +345,14 @@ def test_images_are_bounded_temporary_and_originals_are_untouched(inspection, mo
     assert len(generated) == 3
     assert all(not path.exists() and not path.parent.exists() for path in generated)
     assert all(inspection[key].read_bytes() == value for key, value in originals.items())
-    call = inspection["calls"][0]
-    assert call["url"].endswith("/chat/completions")
-    assert call["timeout"] == 60.0
-    payload = call["json"]
-    assert payload["response_format"] == {"type": "json_object"}
-    assert payload["thinking"] == {"type": "disabled"}
-    images = [part["image_url"]["url"] for part in payload["messages"][1]["content"] if part["type"] == "image_url"]
+    assert inspection["client_options"]["timeout"] == 90.0
+    assert inspection["client_options"]["max_retries"] == 0
+    assert inspection["client_options"]["base_url"] == "https://api.openai.com/v1"
+    payload = inspection["calls"][0]
+    assert payload["text"]["format"] == {"type": "json_schema", "name": "composition_inspection", "schema": quality._ANSWER_SCHEMA, "strict": True}
+    assert payload["store"] is False
+    assert payload["max_output_tokens"] == 6000
+    images = [part["image_url"] for part in payload["input"][0]["content"] if part["type"] == "input_image"]
     assert len(images) == 3
     for url in images:
         assert url.startswith("data:image/jpeg;base64,")
@@ -377,9 +387,9 @@ def test_selected_finish_uses_actual_swatch_and_explicit_surface(inspection):
     assert result["status"] == "passed"
     assert result["checks"]["finish_targets"]["status"] == "passed"
     assert result["finishes"][0]["requested_target"] == "accent_wall"
-    content = inspection["calls"][0]["json"]["messages"][1]["content"]
-    assert len([part for part in content if part["type"] == "image_url"]) == 4
-    assert content[-2] == {"type": "text", "text": "FINISH wallpaper-1"}
+    content = inspection["calls"][0]["input"][0]["content"]
+    assert len([part for part in content if part["type"] == "input_image"]) == 4
+    assert content[-2] == {"type": "input_text", "text": "FINISH wallpaper-1"}
     assert "accent_wall" in content[0]["text"]
     assert str(inspection["asset"]) not in content[0]["text"]
 
@@ -430,3 +440,71 @@ def test_finish_reference_limit_is_bounded(inspection):
     snapshot = {"finishes": [{"id": f"finish-{index}", "category": "wallpaper", "target": "auto", "source_path": str(inspection["asset"])} for index in range(5)]}
     assert inspection["run"](snapshot=snapshot)["status"] == "unverified"
     assert inspection["calls"] == []
+
+
+@pytest.mark.parametrize("change", [
+    {"refusal": True}, {"status": "incomplete"}, {"status": "failed"},
+    {"message_status": "incomplete"}, {"incomplete_details": {"reason": "max_output_tokens"}},
+    {"response_error": {"message": "test-super-secret"}},
+])
+def test_refusals_and_incomplete_responses_are_unverified_with_usage_preserved(inspection, change):
+    inspection.update(change)
+    result = inspection["run"]()
+    assert result["status"] == "unverified"
+    assert result["provider_invoked"] is True
+    assert result["usage"]["total_tokens"] == 300
+    assert result["repair_instruction"] == ""
+    assert "test-super-secret" not in repr(result)
+    assert len(inspection["calls"]) == 1
+
+
+def test_strict_schema_is_real_nested_required_json_schema():
+    def walk(node):
+        assert isinstance(node, dict)
+        if node.get("type") == "object":
+            assert node["additionalProperties"] is False
+            assert set(node["required"]) == set(node["properties"])
+            for child in node["properties"].values():
+                walk(child)
+        elif node.get("type") == "array":
+            walk(node["items"])
+        else:
+            assert "type" in node
+    assert quality._ANSWER_SCHEMA["type"] == "object"
+    walk(quality._ANSWER_SCHEMA)
+    row = quality._ANSWER_SCHEMA["properties"]["inventory"]["items"]["properties"]
+    assert row["set_complete"]["type"] == ["boolean", "null"]
+    assert row["observed_instance_count"]["type"] == ["integer", "null"]
+
+
+@pytest.mark.parametrize("location", ["root", "inventory", "check"])
+def test_extra_fields_from_malformed_transport_cannot_pass(inspection, location):
+    target = (inspection["answer"] if location == "root" else inspection["answer"]["inventory"][0]
+              if location == "inventory" else inspection["answer"]["checks"]["fixed_structure"])
+    target["unexpected"] = "not part of strict schema"
+    assert inspection["run"]()["status"] == "unverified"
+
+
+def test_real_responses_sdk_serializes_strict_schema_and_image_inputs(inspection, monkeypatch):
+    from openai import OpenAI as RealOpenAI
+    calls = []
+    def transport(request):
+        calls.append((str(request.url), json.loads(request.read())))
+        return httpx.Response(200, json={
+            "id": "resp_mock", "object": "response", "created_at": 1, "status": "completed",
+            "model": "gpt-5-mini", "error": None, "incomplete_details": None,
+            "output": [{"id": "msg_mock", "type": "message", "status": "completed", "role": "assistant",
+                        "content": [{"type": "output_text", "text": json.dumps(inspection["answer"]), "annotations": []}]}],
+            "usage": {"input_tokens": 200, "output_tokens": 100, "total_tokens": 300},
+        })
+    monkeypatch.setattr(openai_provider, "OpenAI", lambda **kw: RealOpenAI(
+        **kw, http_client=httpx.Client(transport=httpx.MockTransport(transport))))
+    result = inspection["run"]()
+    assert result["status"] == "passed"
+    assert len(calls) == 1
+    url, payload = calls[0]
+    assert url == "https://api.openai.com/v1/responses"
+    assert payload["store"] is False
+    assert payload["text"]["format"]["strict"] is True
+    assert payload["model"] == "gpt-5-mini"
+    assert len([part for part in payload["input"][0]["content"] if part["type"] == "input_image"]) == 3

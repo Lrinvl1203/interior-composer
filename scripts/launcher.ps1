@@ -21,6 +21,14 @@ $started = New-Object 'System.Collections.Generic.List[string]'
 function Get-Port([string]$Name, [int]$Fallback) {
     $raw = [Environment]::GetEnvironmentVariable($Name, 'Process')
     if ([string]::IsNullOrWhiteSpace($raw)) {
+        $portsFile = Join-Path $root '.local\ports.json'
+        if (Test-Path -LiteralPath $portsFile -PathType Leaf) {
+            $ports = Get-Content -LiteralPath $portsFile -Raw | ConvertFrom-Json
+            $property = if ($Name -eq 'INTERIOR_FRONTEND_PORT') { 'frontend' } else { 'backend' }
+            $raw = "$($ports.$property)"
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($raw)) {
         $envFile = Join-Path $root '.env'
         if (Test-Path -LiteralPath $envFile -PathType Leaf) {
             foreach ($line in (Get-Content -LiteralPath $envFile)) {
@@ -72,6 +80,20 @@ function Get-Tree($RootProcess) {
 
 function Get-Listeners([int]$Port) {
     return @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
+}
+
+function Get-NodeExecutable {
+    $recordPath = Join-Path $root '.local\runtime-paths.json'
+    if (Test-Path -LiteralPath $recordPath -PathType Leaf) {
+        $runtime = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+        if ($runtime.node -and (Test-Path -LiteralPath $runtime.node -PathType Leaf)) {
+            $env:PATH = "$(Split-Path -Parent $runtime.node);$env:PATH"
+            return $runtime.node
+        }
+    }
+    $command = Get-Command node.exe -ErrorAction SilentlyContinue
+    if ($command) { return $command.Source }
+    throw 'Node.js runtime missing. Run install.bat first.'
 }
 
 function Save-Record([string]$Name, $Record, $RootProcess) {
@@ -179,7 +201,9 @@ try {
             Write-Output "$($pair[0]): $status (127.0.0.1:$($pair[1]))"
         }
     } else {
-        $node = (Get-Command node.exe -ErrorAction Stop).Source
+        # Child services use only this standalone project's .env, never a Codex/parent-shell key.
+        Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
+        $node = Get-NodeExecutable
         if (-not (Test-Path -LiteralPath $next)) { throw 'Missing frontend/node_modules. Run install.bat first.' }
         Start-ServiceOwned 'backend' $python @('-m', 'uvicorn', 'webapp.server:app', '--host', '127.0.0.1', '--port', "$backendPort") $root $backendPort
         $mode = if ($Production) { 'start' } else { 'dev' }
