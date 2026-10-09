@@ -1,0 +1,396 @@
+{
+  "source_commit": "4d8ef239519d93bbb33be06f8f3a319df354c236",
+  "source_module": "webapp/server.py",
+  "extracted_functions": [
+    {
+      "name": "modelark_status",
+      "start_line": 124,
+      "end_line": 128,
+      "sha256": "dae3fbb9e5870423587a5436acf2373c4d0d726dc5d564cf0e19a853e3ed5424"
+    },
+    {
+      "name": "ai_providers_status",
+      "start_line": 131,
+      "end_line": 149,
+      "sha256": "b034a62aaa8be4d65a72aad1406bdf54b498d5d0119e82512a23a7849156c7eb"
+    },
+    {
+      "name": "normalize_ai_mode",
+      "start_line": 152,
+      "end_line": 156,
+      "sha256": "ac4e1ac2b10b86f9988bb224bb13537891677f870d8d7e327116424d3cc0b958"
+    },
+    {
+      "name": "local_image_url",
+      "start_line": 232,
+      "end_line": 241,
+      "sha256": "4e2149aa021e145e6b2d2f70f9e31706a8af393c6cab1aa8348c723449506675"
+    },
+    {
+      "name": "finish_library_data",
+      "start_line": 244,
+      "end_line": 259,
+      "sha256": "f925ea0e49f4208b5f98c56c18088353fed068c6f1943c32bc0d01a3098e6427"
+    },
+    {
+      "name": "valid_finish_selections",
+      "start_line": 296,
+      "end_line": 313,
+      "sha256": "4659b4dc73362d7dd3f01555b97217afe37846da36e17f48f5a0fe405f1482c6"
+    },
+    {
+      "name": "list_finish_library",
+      "start_line": 341,
+      "end_line": 343,
+      "sha256": "93cacd4e570c4e9fb120de1533b67e1360748312c0e99b7a43cbfb89acec0bc3"
+    },
+    {
+      "name": "upload_finish_library_item",
+      "start_line": 349,
+      "end_line": 386,
+      "sha256": "a0469ee974707abb7341ca7d99bba9b0d8b319665b966d0c3ccb48963e790e02"
+    },
+    {
+      "name": "korean_http",
+      "start_line": 394,
+      "end_line": 395,
+      "sha256": "18e73dbf0bfe1f8becf969ea44baad28572b4e5852d6b205ac94a57f248b429b"
+    },
+    {
+      "name": "standardized_http_error",
+      "start_line": 418,
+      "end_line": 421,
+      "sha256": "cd68e3e4e63a82466ee925f4d7c0c89555e4e4db4fe18b2ecb9dbcc81489a223"
+    },
+    {
+      "name": "standardized_internal_error",
+      "start_line": 424,
+      "end_line": 427,
+      "sha256": "12fe31cb6aa394ce2e255015c0ebab5b68ff2a2ac0742fa85576f3121b3267df"
+    },
+    {
+      "name": "project_timestamp",
+      "start_line": 443,
+      "end_line": 444,
+      "sha256": "394d4b8eb1e56f9ba2a0195afaa0662d803c0499912e18452468d314de3f1e3f"
+    },
+    {
+      "name": "file_sha256",
+      "start_line": 447,
+      "end_line": 452,
+      "sha256": "a7be5acbb1bdbe0bbeba388f64879deae660d6ae34774ad726d2abe65415dd9b"
+    },
+    {
+      "name": "safe_provider_usage",
+      "start_line": 455,
+      "end_line": 460,
+      "sha256": "4721db86610b19f9cc386a1d13d406045883429a871fbd68bf3c8d81df4610bc"
+    },
+    {
+      "name": "output_file_from_row",
+      "start_line": 551,
+      "end_line": 556,
+      "sha256": "e3d9e19d1f091449391b0654cc790d95c17c16c16f5457b8d3ffe54d72cc2530"
+    },
+    {
+      "name": "read_asset_rows",
+      "start_line": 559,
+      "end_line": 570,
+      "sha256": "649adbd284383f7df9f586293e22e08b6b652e0e2331e651443ebb1b5320173f"
+    },
+    {
+      "name": "write_asset_rows_atomically",
+      "start_line": 573,
+      "end_line": 601,
+      "sha256": "0a23cd83706eb5fe81d001f7e8a7b7db703dbdbc14ae28f506547746c5d04819"
+    },
+    {
+      "name": "asset_response",
+      "start_line": 604,
+      "end_line": 616,
+      "sha256": "7d6991b0e068dec249506726060182dc71a952ced048ad037de97277b2406d49"
+    },
+    {
+      "name": "tail_text",
+      "start_line": 680,
+      "end_line": 684,
+      "sha256": "9c8f48119e062db0de1d96c06e5f2044d2178ab0406c5649cedc614bae6d31e9"
+    },
+    {
+      "name": "parse_bool",
+      "start_line": 725,
+      "end_line": 736,
+      "sha256": "e5dd7139b1acbaf9ea179b01c11f06f44d975b53f05bdb0664e0a838fff3b329"
+    },
+    {
+      "name": "parse_prompt_json",
+      "start_line": 782,
+      "end_line": 786,
+      "sha256": "e2295dd270c0dcd716e8d321619c2b7564380326f09e584047be92bd8575d181"
+    },
+    {
+      "name": "parse_box_prompt",
+      "start_line": 789,
+      "end_line": 797,
+      "sha256": "e8d099cb9a507fb0fa91d31c91cc7717149cc1226f8b9f67f4366032e78a6027"
+    },
+    {
+      "name": "parse_points_prompt",
+      "start_line": 800,
+      "end_line": 813,
+      "sha256": "a7faba37258ab3e19630b47560847f27acd78ea9dfb35d1ef1cced9749e15890"
+    },
+    {
+      "name": "load_uploaded_image",
+      "start_line": 816,
+      "end_line": 823,
+      "sha256": "d2938c97f3e3b5e07ccbe05376414a13bbf164ba3da9f2f4d7673c3882fb283f"
+    },
+    {
+      "name": "get_rembg_session",
+      "start_line": 870,
+      "end_line": 878,
+      "sha256": "ef8a8b6be446653ae3e2534cff88729c48220027107453e63fe83543fe20ca82"
+    },
+    {
+      "name": "save_asset_with_method",
+      "start_line": 881,
+      "end_line": 904,
+      "sha256": "52ac425b8046d5c1adeaa3a9a88b0b040513db626ead4c720abd6f1f0b204f35"
+    },
+    {
+      "name": "update_job",
+      "start_line": 907,
+      "end_line": 912,
+      "sha256": "d1a26caecc62351adf1f69c1a3f2a793c326df0393378f31f564b1b057c1a1b0"
+    },
+    {
+      "name": "create_job",
+      "start_line": 915,
+      "end_line": 930,
+      "sha256": "ef1748f8f08bafa838aff98e40e489508127d6c89b350e99c0ed1aac25da1644"
+    },
+    {
+      "name": "job_slot_runner",
+      "start_line": 940,
+      "end_line": 956,
+      "sha256": "b98119313c656b5fc838d7acef6879a756a32a5ae9f0734590862daffb1ae9c8"
+    },
+    {
+      "name": "start_job_worker",
+      "start_line": 959,
+      "end_line": 961,
+      "sha256": "1f1e9d62c8850c41c445ec7027794790f0067f0c38b70dc01ac247cfd75fc89b"
+    },
+    {
+      "name": "finish_job_error",
+      "start_line": 975,
+      "end_line": 983,
+      "sha256": "67deef8648e797f15ff4a9427825a409d44721aec3c0f2fb252e8b4dd6f2b12a"
+    },
+    {
+      "name": "INTERIOR_PLACEMENT_RULES",
+      "start_line": 1597,
+      "end_line": 1605,
+      "sha256": "8997185b71c0cff03915835004ca03a299b7d6df15ba6ac6744265cf10c03a29"
+    },
+    {
+      "name": "build_interior_compose_prompt",
+      "start_line": 1608,
+      "end_line": 1698,
+      "sha256": "a6faaf3d7c504f8666a2dc785479b9e875b021caad8d6d4d24edacf3ba4faa18"
+    },
+    {
+      "name": "interior_compose_worker",
+      "start_line": 1701,
+      "end_line": 1826,
+      "sha256": "1dd5512e20b7ed842fb700b03b22bf1e5862ad2e3c3b826cf3c925250bd6d223"
+    },
+    {
+      "name": "list_assets",
+      "start_line": 3828,
+      "end_line": 3830,
+      "sha256": "753b866a522833aff6091be639bec2f8dff39430eed1cf8de699f2b981c494e2"
+    },
+    {
+      "name": "update_asset",
+      "start_line": 3924,
+      "end_line": 3950,
+      "sha256": "fc636cbc1f2a130b9707742061bbe235295c23047777c2eba0827cddd4ddb375"
+    },
+    {
+      "name": "delete_asset",
+      "start_line": 3953,
+      "end_line": 3973,
+      "sha256": "b9b867a203eb7dead644a269399394f798dd8084b68d2a75e47b09fddcebe460"
+    },
+    {
+      "name": "ai_asset_extract_worker",
+      "start_line": 3976,
+      "end_line": 4068,
+      "sha256": "790788f069a64ea9f59c5085d00dceebd947c0459d26f18c498d905d6c0f866f"
+    },
+    {
+      "name": "extract_asset",
+      "start_line": 4071,
+      "end_line": 4159,
+      "sha256": "eef2fd954daa32ec77b22e99271e13cf4b79573856f0d2c9043937155174a9e4"
+    },
+    {
+      "name": "create_interior_compose_job",
+      "start_line": 4255,
+      "end_line": 4433,
+      "sha256": "22acf346de878a83a357a7068193537f9a35039533c4758336b23bc8b5ea6a6c"
+    },
+    {
+      "name": "REPORT_CATEGORY_LABELS",
+      "start_line": 4436,
+      "end_line": 4441,
+      "sha256": "77daf2e0251ecbfdc5626fe99544aa52f07a59023398066c4b50b8eba99fe60f"
+    },
+    {
+      "name": "REPORT_TARGET_LABELS",
+      "start_line": 4442,
+      "end_line": 4451,
+      "sha256": "d74feac85f678f3e7d459fac2dec6cf5c7893a4360ce3a5bea7ddfed7b3a245f"
+    },
+    {
+      "name": "review_interior_compose",
+      "start_line": 4454,
+      "end_line": 4491,
+      "sha256": "45719f1ab1d6a0a174833a91e0bded35d4ccda95c33513c3979de14c956285a2"
+    },
+    {
+      "name": "normalized_interior_report_id",
+      "start_line": 4494,
+      "end_line": 4498,
+      "sha256": "025c56127f5c796dfc58e0b937c3975876c490d22813bcb86339da65990963c9"
+    },
+    {
+      "name": "read_interior_report",
+      "start_line": 4501,
+      "end_line": 4512,
+      "sha256": "8000ee339e81788fbaacf69363244103153f73ad7dd363ed11f59b5fc17e5bb1"
+    },
+    {
+      "name": "find_interior_report_for_job",
+      "start_line": 4515,
+      "end_line": 4532,
+      "sha256": "9a211a32b41ef91839e012e39a84f339af2753848671e25b41c39af0922f1443"
+    },
+    {
+      "name": "interior_report_versions",
+      "start_line": 4535,
+      "end_line": 4552,
+      "sha256": "cacbd2977c7d11aa6b0099935df4ebedb081a220759a698033ee52dce7bc9ce5"
+    },
+    {
+      "name": "public_interior_report",
+      "start_line": 4555,
+      "end_line": 4561,
+      "sha256": "5abcf934d6890bf6533abcd421d89dabeeeb82281dae3ef5e9ca265c189e710e"
+    },
+    {
+      "name": "interior_report_consultation",
+      "start_line": 4564,
+      "end_line": 4597,
+      "sha256": "b29ad37f53e98bb8935726c2200fdba5dac1596f1de585706a5cb0e279f35f70"
+    },
+    {
+      "name": "create_interior_report",
+      "start_line": 4600,
+      "end_line": 4760,
+      "sha256": "5c3d695d75561fbfc781ba2a7d2df66f3deefbefc65131d1f834953f49e64201"
+    },
+    {
+      "name": "get_interior_report",
+      "start_line": 4763,
+      "end_line": 4765,
+      "sha256": "27092256e4ad72ee5da8214a18963d9f5ca2701d1e523f63106ccd5922a2cdd6"
+    },
+    {
+      "name": "get_interior_report_pdf",
+      "start_line": 4768,
+      "end_line": 4776,
+      "sha256": "f6f95daac5b4cbb940183c64b4776ddbb583eab9e92745828cbdb63b23dff834"
+    },
+    {
+      "name": "get_job",
+      "start_line": 4989,
+      "end_line": 5020,
+      "sha256": "2b4589f4e105686aa008eabd82d046eb918a52a6e10235661ac0ae9938b50a54"
+    }
+  ],
+  "copied_files": [
+    {
+      "path": "webapp/image_align.py",
+      "source_sha256": "ea50b4e40b3ca9613e5c15b27413f101b5a9645003e5e4959b444e0def16c6fb"
+    },
+    {
+      "path": "webapp/interior_report.py",
+      "source_sha256": "16be810a27566778bc10ab12a9b4a0432d3157793798d8e19aa30d3ce9bbe120"
+    },
+    {
+      "path": "webapp/composition_quality.py",
+      "source_sha256": "88a29eaaf3346961fe9de33d79d78acb964c18103781304488eded62e46f0f15"
+    },
+    {
+      "path": "webapp/modelark.py",
+      "source_sha256": "f1c461cf0bf526798c96d3a41c82d8bbce77f77b937575b6722e991f571ad012"
+    },
+    {
+      "path": "webapp/openai_provider.py",
+      "source_sha256": "ece293b54632e4c2db417ae9eed4af8353d1e767ba5833bd73400c5387b02245"
+    },
+    {
+      "path": "room-asset-composer/services/__init__.py",
+      "source_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "room-asset-composer/services/asset_store.py",
+      "source_sha256": "1e56ceeae20428487bcc84a99768ac8624654b299be71cde584ab03a92cf608f"
+    },
+    {
+      "path": "room-asset-composer/services/ai_asset.py",
+      "source_sha256": "aee6908dab174763a689ea19bebff854dfee5e6161d8783de862c8bee7ca9d35"
+    },
+    {
+      "path": "room-asset-composer/services/image_postprocess.py",
+      "source_sha256": "c632a087af0cc162909bc383554337f53ebdae82b7ccab3f4eb03c0936330580"
+    },
+    {
+      "path": "room-asset-composer/services/sam_auto.py",
+      "source_sha256": "12d87b4ff35d112a003cbd405c7633c07419b7cd283dc946ec85c39d4714679f"
+    },
+    {
+      "path": "room-asset-composer/services/sam_client.py",
+      "source_sha256": "8849145a78ee723866dea5f8108246ea3a3060b102806b79a96ab5c6fa2edccd"
+    },
+    {
+      "path": "room-asset-composer/services/bg_remove.py",
+      "source_sha256": "87af1b7301911d90bc9cb89e67d56f893cdb3fd87694a4c8aec73432288664c0"
+    },
+    {
+      "path": "tests/test_interior_composer.py",
+      "source_sha256": "b549ec2ff8f93d8478d3ebcdfd18fb9870ca54ef469bd844d7e4b377d5fe0dbf"
+    },
+    {
+      "path": "tests/test_composition_quality.py",
+      "source_sha256": "f77b27d67954713c74a0f000c2fb7cf78b847d7cec758a2e5cd74a1f059b4d31"
+    },
+    {
+      "path": "tests/test_modelark.py",
+      "source_sha256": "f6be9fd1504b24ffa8617f7510f7165984513ff5e4deb9d2cfee02f4be9e3198"
+    }
+  ],
+  "standalone_adaptations": [
+    "Composer-only module dependencies and assets/jobs database",
+    "Root .env and target-local runtime paths; no runtime data copied",
+    "Missing provider fails explicitly; no local Codex CLI/cache fallback",
+    "Public static paths restricted to images, reports PDF endpoint, and health endpoint",
+    "Empty asset installation returns []; upload decoding is limited to 25 MB and 40 million pixels",
+    "Mutations reject non-loopback origins, unexpected local ports, null origins and Sec-Fetch-Site cross-site",
+    "Local model caches resolve inside the standalone tree by default; no weights copied",
+    "Persist safe browser-facing job errors; explicit known missing-key guidance and no raw provider error/log disclosure"
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "version": "standalone-samples-1",
+  "categories": [
+    {
+      "key": "wallpaper",
+      "label": "도배"
+    },
+    {
+      "key": "flooring",
+      "label": "장판"
+    },
+    {
+      "key": "film",
+      "label": "필름"
+    },
+    {
+      "key": "tile",
+      "label": "타일"
+    }
+  ],
+  "items": [
+    {
+      "id": "wp-pure-white",
+      "category": "wallpaper",
+      "name": "순백 무지 · 예시",
+      "tone": "화이트",
+      "finish": "무광",
+      "tier": "예시",
+      "note": "절차적으로 만든 설명용 샘플. 실제 제품·성능 보증이 아닙니다."
+    },
+    {
+      "id": "wp-sage-green",
+      "category": "wallpaper",
+      "name": "세이지그린 · 예시",
+      "tone": "그린",
+      "finish": "무광",
+      "tier": "예시",
+      "note": "절차적으로 만든 설명용 샘플. 실제 제품·성능 보증이 아닙니다."
+    },
+    {
+      "id": "wp-warm-gray",
+      "category": "wallpaper",
+      "name": "웜그레이 · 예시",
+      "tone": "그레이",
+      "finish": "무광",
+      "tier": "예시",
+      "note": "절차적으로 만든 설명용 샘플. 실제 제품·성능 보증이 아닙니다."
+    },
+    {
+      "id": "fl-light-oak",
+      "category": "flooring",
+      "name": "라이트 오크 · 예시",
+      "tone": "우드",
+      "finish": "무광",
+      "tier": "예시",
+      "note": "절차적으로 만든 설명용 샘플. 실제 제품·성능 보증이 아닙니다."
+    },
+    {
+      "id": "fl-walnut",
+      "category": "flooring",
+      "name": "월넛 플랭크 · 예시",
+      "tone": "우드",
+      "finish": "무광",
+      "tier": "예시",
+      "note": "절차적으로 만든 설명용 샘플. 실제 제품·성능 보증이 아닙니다."
+    },
+    {
+      "id": "fl-gray-stone",
+      "category": "flooring",
+      "name": "그레이 스톤 · 예시",
+      "tone": "그레이",
+      "finish": "무광",
+      "tier": "예시",
+      "note": "절차적으로 만든 설명용 샘플. 실제 제품·성능 보증이 아닙니다."
+    },
+    {
+      "id": "fm-warm-white",
+      "category": "film",
+      "name": "웜화이트 필름 · 예시",
+      "tone": "화이트",
+      "finish": "무광",
+      "tier": "예시",
+      "note": "절차적으로 만든 설명용 샘플. 실제 제품·성능 보증이 아닙니다."
+    },
+    {
+      "id": "fm-oak",
+      "category": "film",
+      "name": "오크 필름 · 예시",
+      "tone": "우드",
+      "finish": "무광",
+      "tier": "예시",
+      "note": "절차적으로 만든 설명용 샘플. 실제 제품·성능 보증이 아닙니다."
+    },
+    {
+      "id": "fm-charcoal",
+      "category": "film",
+      "name": "차콜 필름 · 예시",
+      "tone": "차콜",
+      "finish": "무광",
+      "tier": "예시",
+      "note": "절차적으로 만든 설명용 샘플. 실제 제품·성능 보증이 아닙니다."
+    },
+    {
+      "id": "tl-ivory",
+      "category": "tile",
+      "name": "아이보리 타일 · 예시",
+      "tone": "아이보리",
+      "finish": "무광",
+      "tier": "예시",
+      "note": "절차적으로 만든 설명용 샘플. 실제 제품·성능 보증이 아닙니다."
+    },
+    {
+      "id": "tl-sage",
+      "category": "tile",
+      "name": "세이지 타일 · 예시",
+      "tone": "그린",
+      "finish": "무광",
+      "tier": "예시",
+      "note": "절차적으로 만든 설명용 샘플. 실제 제품·성능 보증이 아닙니다."
+    },
+    {
+      "id": "tl-gray",
+      "category": "tile",
+      "name": "그레이 타일 · 예시",
+      "tone": "그레이",
+      "finish": "무광",
+      "tier": "예시",
+      "note": "절차적으로 만든 설명용 샘플. 실제 제품·성능 보증이 아닙니다."
+    }
+  ]
+}
